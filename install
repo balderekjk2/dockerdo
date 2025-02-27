@@ -1,0 +1,31 @@
+#!/bin/bash
+
+PS3="install selection: "
+options=("nano syntax" "dockerdo" "both" "none")
+select opt in "${options[@]}"; do
+    [[ -n $opt ]] && break
+done
+[[ $opt == "none" ]] && exit 0
+read -p "you are installing $opt? (y/n): " -r in && [[ $in != "y" ]] && exit 0
+
+if [[ $opt =~ ^(nano syntax|both)$ ]]; then
+    echo "# GALENGUYER" >> ~/.nanorc
+    mkdir -p ~/.nano/syntax
+    wget https://raw.githubusercontent.com/galenguyer/nano-syntax-highlighting/master/install.sh -O- | bash
+    sed -i '/# GALENGUYER/,$d' ~/.nanorc
+    rm -rf ~/.nano/{install.sh,license,nanorc,readme.md,tool}
+    mv ~/.nano/*.nanorc ~/.nano/syntax
+    echo 'include "~/.nano/syntax/*.nanorc"' >> ~/.nanorc
+    echo
+    echo "nano syntax success"
+    echo "note that this script did not install nano, you will have to do that separately"
+fi
+
+if [[ $opt =~ ^(dockerdo|both)$ ]]; then
+    mkdir -p ~/.local/bin
+    chmod +x dockerdo
+    cp dockerdo ~/.local/bin/dockerdo
+    echo "export PATH=~/.local/bin:$PATH" >> ~/.bashrc
+    source ~/.bashrc
+    dockerdo help
+fi
