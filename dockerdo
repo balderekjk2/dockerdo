@@ -1,0 +1,118 @@
+#!/bin/bash
+
+[[ $2 != "it" ]] && [[ -f .env ]] && source .env
+
+
+if [[ $1 =~ ^(build|brush)$ ]]; then
+    cat << 'EOF' | { less || more || cat; } > Dockerfile
+ARG IMAGE_SOURCE
+ARG WORKDIR
+
+FROM ${IMAGE_SOURCE}
+COPY . ${WORKDIR}
+WORKDIR ${WORKDIR}
+RUN mkdir -p /root/.nano/syntax
+RUN PKG_MGR=$(command -v apk || command -v apt || command -v dnf || command -v yum) && \
+    $PKG_MGR update 2>/dev/null && \
+    { $PKG_MGR add nano || $PKG_MGR install -y nano; } 2>/dev/null
+RUN echo "set mouse" > /root/.nanorc && \
+    echo "set multibuffer" >> /root/.nanorc && \
+    echo "set casesensitive" >> /root/.nanorc && \
+    echo "set softwrap" >> /root/.nanorc && \
+    echo "set tabsize 4" >> /root/.nanorc && \
+    echo "include \"~/.nano/syntax/*.nanorc\"" >> /root/.nanorc
+CMD [ "tail", "-f", "/dev/null" ]
+EOF
+fi
+
+if [[ "${1:-help}" == "help" ]]; then
+    cat << EOF | { less || more || cat; } 2> /dev/null
+ ----------------- 
+|  dockerdo help  |
+ ----------------- 
+(If you are seeing this, dockerdo is installed)
+
+OPTIONS
+first slot: build, run, shell, brush, start, stop, restart, rm, rmi, expel, ps, images, help
+second slot: it (interactive, does not read from your .env)
+
+ENV
+create .env with below to automate:
+IMAGE_SOURCE=_____
+IMAGE_NAME=_____
+WORKDIR=_____
+CONTAINER_NAME=_____
+NANO_SYNTAX_DIR=_____
+
+HINTS
+'dockerdo help' to revisit this info
+'dockerdo build' to build from a .env
+'dockerdo build it' to build from scratch
+'dockerdo build -> dockerdo run -> dockerdo shell' in that order
+'dockerdo brush' to (b)uild, (ru)n, then (sh)ell consecutively
+'dockerdo expel' to tear it all down
+EOF
+elif [[ $1 == "brush" ]]; then
+    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -p "build from image i.e. alpine:3.20 : " in && echo "$in")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -p "name of new image i.e. alpine3-20 : " in && echo "$in")}
+    WORKDIR=${WORKDIR:-$(read -p "working directory of new image i.e. /usr/src/app : " in && echo "$in")}
+    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -p "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "$in")}
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -p "name of container i.e. alpine3-app : " in && echo "$in")}
+    cat << EOF | { less || more || cat; } > .env
+IMAGE_SOURCE=$IMAGE_SOURCE
+IMAGE_NAME=$IMAGE_NAME
+CONTAINER_NAME=$CONTAINER_NAME
+WORKDIR=$WORKDIR
+NANO_SYNTAX_DIR=$NANO_SYNTAX_DIR
+EOF
+    match_full=$(docker image inspect --format "{{join .RepoTags \", \"}}" "$IMAGE_NAME" 2> /dev/null)
+    if [[ $match_full ]]; then
+        echo -e "\nERROR -> $match_full exists\n"
+        PS3="choose a resolution: "
+        COLUMNS=1
+        select opt in "preserve and autoname image" "expel image and its containers" "exit"; do
+            case $opt in
+                "preserve and autoname image")
+                    sectag=$(date +%s%N | cut -b1-10)
+                    match_pre=$(echo $match_full | cut -d ':' -f1)
+                    docker tag $match_full $match_pre:$sectag && docker rmi $match_full
+                    echo "conflicting image was renamed to $match_full:$sectag";
+                    break
+                    ;;
+                "expel image and its containers") dockerdo expel $match_full; break;;
+                "exit") echo "exiting"; exit 1;;
+                *) echo "exiting"; exit 1;;
+            esac
+        done
+    fi
+    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="${WORKDIR:-/usr/src/app}" -t "$IMAGE_NAME" .
+    docker run -d -v "${NANO_SYNTAX_DIR:-/usr/share/nano}":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME" 2> /dev/null || { echo "container exists, exiting"; exit 1; }
+    docker exec -it "$CONTAINER_NAME" /bin/bash 2> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
+elif [[ $1 == "build" ]]; then
+    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -p "build from image i.e. alpine:3.20 : " in && echo "$in")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -p "name of new image i.e. alpine3-20 : " in && echo "$in")}
+    WORKDIR=${WORKDIR:-$(read -p "working directory of new image i.e. /usr/src/app : " in && echo "$in")}
+    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="${WORKDIR:-/usr/src/app}" -t "$IMAGE_NAME" .
+elif [[ $1 == "run" ]]; then
+    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -p "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "$in")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -p "name of image i.e. alpine3-20 : " in && echo "$in")}
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -p "name of container i.e. alpine3-app : " in && echo "$in")}
+    docker run -d -v "${NANO_SYNTAX_DIR:-/usr/share/nano}":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME"
+elif [[ $1 == "shell" ]]; then
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -p "name of container to shell into : " in && echo "$in")}
+    docker exec -it "$CONTAINER_NAME" /bin/bash 2> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
+elif [[ $1 =~ ^(start|stop|restart|rm|rmi)$ ]]; then
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -p "name of relevant : " in && echo "$in")}
+    docker $1 "$CONTAINER_NAME"
+elif [[ $1 == "expel" ]]; then
+    read -p "expel container and image? (y/n): " -r in && [[ $in != "y" ]] && exit 0
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -p "name of container to remove : " in && echo "$in")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -p "name of image to remove : " in && echo "$in")}
+    docker stop "$CONTAINER_NAME" && docker rm "$CONTAINER_NAME" && docker rmi "$IMAGE_NAME"
+elif [[ $1 == "ps" ]]; then
+    docker ps --format "{{.Names}}" | { less || more || cat; } 2> /dev/null
+elif [[ $1 == "images" ]]; then
+    docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}" | { less || more || cat; } 2> /dev/null
+else
+    dockerdo help
+fi
