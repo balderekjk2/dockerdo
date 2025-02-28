@@ -48,14 +48,14 @@ COPY . \${WORKDIR}
 WORKDIR \${WORKDIR}
 $(echo -e $expose_portion)
 RUN mkdir -p /root/.nano/syntax
-RUN PKG_MGR=\$(command -v apk || command -v apt || command -v dnf || command -v yum) && \
-    \$PKG_MGR update 2>/dev/null && \
+RUN PKG_MGR=\$(command -v apk || command -v apt || command -v dnf || command -v yum) && \\
+    \$PKG_MGR update 2>/dev/null && \\
     { \$PKG_MGR add nano || \$PKG_MGR install -y nano; } 2>/dev/null
-RUN echo "set mouse" > /root/.nanorc && \
-    echo "set multibuffer" >> /root/.nanorc && \
-    echo "set casesensitive" >> /root/.nanorc && \
-    echo "set softwrap" >> /root/.nanorc && \
-    echo "set tabsize 4" >> /root/.nanorc && \
+RUN echo "set mouse" > /root/.nanorc && \\
+    echo "set multibuffer" >> /root/.nanorc && \\
+    echo "set casesensitive" >> /root/.nanorc && \\
+    echo "set softwrap" >> /root/.nanorc && \\
+    echo "set tabsize 4" >> /root/.nanorc && \\
     echo "include \"~/.nano/syntax/*.nanorc\"" >> /root/.nanorc
 CMD [ "tail", "-f", "/dev/null" ]
 EOF
@@ -146,7 +146,7 @@ elif [[ $1 == "expel" ]]; then
     IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of image to remove : " in && echo "$in")}
     docker stop "$CONTAINER_NAME" && docker rm "$CONTAINER_NAME" && docker rmi "$IMAGE_NAME"
 elif [[ $1 == "ps" ]]; then
-    docker ps --format ".table {{.Names}}\t{{.Ports}}" | { less || more || cat; } 2> /dev/null
+    docker ps --format "table {{.Names}}\t{{.Ports}}" | { less || more || cat; } 2> /dev/null
 elif [[ $1 == "images" ]]; then
     docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}" | { less || more || cat; } 2> /dev/null
 else
