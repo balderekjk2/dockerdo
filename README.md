@@ -19,13 +19,14 @@ bash install
 
 You will be prompted over which pieces you would like to install.
 
-1. `nano syntax` (type `1`) option uses `https://raw.githubusercontent.com/galenguyer/nano-syntax-highlighting/master/install.sh` to give your nano syntax support.
+1. `nano syntax` (type `1`) option uses `https://raw.githubusercontent.com/galenguyer/nano-syntax-highlighting/master/install.sh` to give your nano syntax support.\
+   You may copy and paste the link to see its contents in browser before installing.
 
-2. `dockerdo` (type `2`) option installs dockerdo into your ~/.local/bin (it will create if path does not exist) and configures your ~/.bashrc to make command available.
+3. `dockerdo` (type `2`) option installs dockerdo into your ~/.local/bin (it will create if path does not exist) and configures your ~/.bashrc to make command available.
 
-3. `both` (type `3`) installs all.
+4. `both` (type `3`) installs all.
 
-4. `none` (type `4`) installs nothing and exits.
+5. `none` (type `4`) installs nothing and exits.
 
 ## Using
 
