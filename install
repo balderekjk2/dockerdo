@@ -33,8 +33,8 @@ if [[ $opt =~ ^(dockerdo|both)$ ]]; then
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo " SUCCESS dockerdo installed "
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo "to get started, run         "
-    echo "dockerdo help               "
+    echo "to get started, run"
+    echo "dockerdo help"
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo
 fi
