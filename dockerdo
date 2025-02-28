@@ -20,7 +20,7 @@ IMAGE_NAME=$IMAGE_NAME
 CONTAINER_NAME=$CONTAINER_NAME
 WORKDIR=$WORKDIR
 NANO_SYNTAX_DIR=$NANO_SYNTAX_DIR
-PORT_MAPPINGS="$PORT_MAPPINGS"
+PORT_MAPPINGS=$PORT_MAPPINGS
 EOF
 }
 
@@ -92,11 +92,11 @@ HINTS
 'dockerdo expel' to tear it all down
 EOF
 elif [[ $1 == "brush" ]]; then
-    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:3.20 : " in && echo "$in")}
-    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine3-20 : " in && echo "$in")}
-    WORKDIR=${WORKDIR:-$(read -ep "working directory of new image i.e. /usr/src/app : " in && echo "$in")}
-    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -ep "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "$in")}
-    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine3-app : " in && echo "$in")}
+    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:latest : " in && echo "${in:-alpine:latest}")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine-latest : " in && echo "${in:-alpine-latest}")}
+    WORKDIR=${WORKDIR:-$(read -ep "working directory of new image i.e. /usr/src/app : " in && echo "${in:-/usr/src/app}")}
+    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -ep "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "${in:-/usr/share/nano}")}
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine-app : " in && echo "${in:-alpine-app}")}
     mkenv
     match_full=$(docker image inspect --format "{{join .RepoTags \", \"}}" "$IMAGE_NAME" 2> /dev/null)
     if [[ $match_full ]]; then
@@ -108,6 +108,7 @@ elif [[ $1 == "brush" ]]; then
                 "preserve and autoname image")
                     sectag=$(date +%s%N | cut -b1-10)
                     match_pre=$(echo $match_full | cut -d ':' -f1)
+                    docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
                     docker tag $match_full $match_pre:$sectag && docker rmi $match_full
                     echo "conflicting image was renamed to $match_full:$sectag";
                     break
@@ -118,21 +119,21 @@ elif [[ $1 == "brush" ]]; then
             esac
         done
     fi
-    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="${WORKDIR:-/usr/src/app}" -t "$IMAGE_NAME" .
-    docker run -d -v "${NANO_SYNTAX_DIR:-/usr/share/nano}":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME" 2> /dev/null || { echo "container exists, exiting"; exit 1; }
+    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="$WORKDIR" -t "$IMAGE_NAME" .
+    docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME" 2> /dev/null || { echo "container exists, exiting"; exit 1; }
     docker exec -it "$CONTAINER_NAME" /bin/bash 2> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
 elif [[ $1 == "build" ]]; then
-    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:3.20 : " in && echo "$in")}
-    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine3-20 : " in && echo "$in")}
-    WORKDIR=${WORKDIR:-$(read -ep "working directory of new image i.e. /usr/src/app : " in && echo "$in")}
+    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:latest : " in && echo "${in:-alpine:latest}")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine-app : " in && echo "${in:-alpine-latest}")}
+    WORKDIR=${WORKDIR:-$(read -ep "working directory of new image i.e. /usr/src/app : " in && echo "${in:-/usr/src/app}")}
     mkenv
-    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="${WORKDIR:-/usr/src/app}" -t "$IMAGE_NAME" .
+    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="$WORKDIR" -t "$IMAGE_NAME" .
 elif [[ $1 == "run" ]]; then
-    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -ep "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "$in")}
-    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of image i.e. alpine3-20 : " in && echo "$in")}
-    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine3-app : " in && echo "$in")}
+    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -ep "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "${in:-/usr/share/nano}")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of image i.e. alpine-app : " in && echo "$in")}
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine-app : " in && echo "$in")}
     mkenv
-    docker run -d $portmap_portion -v "${NANO_SYNTAX_DIR:-/usr/share/nano}":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME"
+    docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME"
 elif [[ $1 == "shell" ]]; then
     CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container to shell into : " in && echo "$in")}
     docker exec -it "$CONTAINER_NAME" /bin/bash 2> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
