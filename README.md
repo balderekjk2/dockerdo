@@ -12,7 +12,7 @@ They can then mount this to their container as it gives support for common progr
 ## Installing
 
 ```shell
-git clone --depth 1 https://github.com/balderekjk2/dockerdo ~
+git clone --depth 1 https://github.com/balderekjk2/dockerdo dockerdo
 cd dockerdo
 bash install
 ```
