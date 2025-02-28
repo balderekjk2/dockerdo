@@ -48,7 +48,7 @@ COPY . \${WORKDIR}
 WORKDIR \${WORKDIR}
 $(echo -e $expose_portion)
 RUN mkdir -p /root/.nano/syntax
-RUN PKG_MGR=\$(command -v apk || command -v apt || command -v dnf || command -v yum) && \\
+RUN PKG_MGR=\$(command -v apk || command -v apt || command -v dnf || command -v yum) 2> /dev/null && \\
     \$PKG_MGR update 2>/dev/null && \\
     { \$PKG_MGR add nano || \$PKG_MGR install -y nano; } 2>/dev/null
 RUN echo "set mouse" > /root/.nanorc && \\
@@ -68,6 +68,7 @@ if [[ "${1:-help}" == "help" ]]; then
 |  dockerdo help  |
  ----------------- 
 (If you are seeing this, dockerdo is installed)
+ EXIT with 'q'
 
 OPTIONS
 first slot: brush, build, run, shell, start, stop, restart, rm, rmi, expel, ps, images, help
@@ -144,7 +145,8 @@ elif [[ $1 == "expel" ]]; then
     read -ep "expel container and image? (y/n): " -r in && [[ $in != "y" ]] && exit 0
     CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container to remove : " in && echo "$in")}
     IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of image to remove : " in && echo "$in")}
-    docker stop "$CONTAINER_NAME" && docker rm "$CONTAINER_NAME" && docker rmi "$IMAGE_NAME"
+    docker stop "$CONTAINER_NAME" && docker rm "$CONTAINER_NAME"
+    docker rmi "$IMAGE_NAME"
 elif [[ $1 == "ps" ]]; then
     docker ps --format "table {{.Names}}\t{{.Ports}}" | { less || more || cat; } 2> /dev/null
 elif [[ $1 == "images" ]]; then
