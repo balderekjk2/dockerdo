@@ -29,5 +29,12 @@ if [[ $opt =~ ^(dockerdo|both)$ ]]; then
     sed -i "/^export PATH=~\/\.local\/bin:\$PATH$/d" ~/.bashrc
     echo "export PATH=~/.local/bin:\$PATH" >> ~/.bashrc
     source ~/.bashrc
-    dockerdo help
+    echo
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo " SUCCESS dockerdo installed "
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "to get started, run         "
+    echo "dockerdo help               "
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo
 fi
