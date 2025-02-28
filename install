@@ -1,40 +1,162 @@
 #!/bin/bash
 
-PS3="install selection: "
-options=("nano syntax" "dockerdo" "both" "none")
-select opt in "${options[@]}"; do
-    [[ -n $opt ]] && break
-done
-[[ $opt == "none" ]] && exit 0
-read -p "you are installing $opt? (y/n): " -r in && [[ $in != "y" ]] && exit 0
+[[ ! $2 =~ ^(it|init)$ ]] && [[ -f .env ]] && source .env
 
-if [[ $opt =~ ^(nano syntax|both)$ ]]; then
-    echo "# GALENGUYER" >> ~/.nanorc
-    mkdir -p ~/.nano/syntax
-    wget https://raw.githubusercontent.com/galenguyer/nano-syntax-highlighting/master/install.sh -O- | bash
-    sed -i '/# GALENGUYER/,$d' ~/.nanorc
-    rm -rf ~/.nano/{install.sh,license,nanorc,readme.md,tool}
-    mv ~/.nano/*.nanorc ~/.nano/syntax
-    sed -i "/include .~\/\.nano\/syntax\/\*\.nanorc./d" ~/.nanorc
-    echo 'include "~/.nano/syntax/*.nanorc"' >> ~/.nanorc
-    echo
-    echo "nano syntax success"
-    echo "note that this script did not install nano, you will have to do that separately"
+mkenv() {
+    if [[ $2 == "init" ]]; then
+        echo "'n' will leave .env untouched, but fulfill command"
+        echo "press 'Ctrl+C' to cancel"
+        [[ -f .env ]] && read -ep "WARNING: you are creating/ovewriting .env (y/n): " -r in && [[ $in != "y" ]] && return
+    elif [[ $2 == "add" ]]; then
+        echo "'n' will leave .env untouched, but fulfill command"
+        echo "press 'Ctrl+C' to cancel"
+        [[ -f .env ]] && read -ep "WARNING: you are adding to .env (y/n): " -r in && [[ $in != "y" ]] && return
+    elif [[ $2 != "it" && ! -f .env ]]; then
+        read -ep "create .env? (y/n): " -r in && [[ $in != "y" ]] && return
+    fi
+    cat << EOF > .env
+IMAGE_SOURCE=$IMAGE_SOURCE
+IMAGE_NAME=$IMAGE_NAME
+CONTAINER_NAME=$CONTAINER_NAME
+WORKDIR=$WORKDIR
+NANO_SYNTAX_DIR=$NANO_SYNTAX_DIR
+PORT_MAPPINGS=$PORT_MAPPINGS
+EOF
+}
+
+PORT_MAPPINGS=$PORT_MAPPINGS
+expose_portion=""
+portmap_portion=""
+if [[ $1 =~ ^(build|brush|run)$ ]]; then
+    PORT_MAPPINGS=${PORT_MAPPINGS:-$(read -ep "port mappings i.e '8000:8000, 8001:8001' : " in && echo "$in")}
+    PORT_MAPPINGS=$(echo "$PORT_MAPPINGS" | tr -d " ")
+    IFS=", " read -ra ports <<< $PORT_MAPPINGS
+    for port in "${ports[@]}"; do
+        if [[ $port =~ ^([1-9][0-9]*:?([1-9][0-9]*)?)$ ]]; then
+            portmap_portion+="-p ${BASH_REMATCH[1]} "
+            expose_portion+="EXPOSE $(cut -d ":" -f2 <<< "$port")/tcp\n"
+        fi
+    done
+
+    if [[ $1 != "run" ]]; then
+        cat << EOF > Dockerfile
+ARG IMAGE_SOURCE
+ARG WORKDIR
+
+FROM \${IMAGE_SOURCE}
+
+COPY . \${WORKDIR}
+WORKDIR \${WORKDIR}
+$(echo -e $expose_portion)
+RUN mkdir -p /root/.nano/syntax
+RUN PKG_MGR=\$(command -v apk || command -v apt || command -v dnf || command -v yum) || true && \
+    if [ -n "\$PKG_MGR" ]; then \
+        \$PKG_MGR update || true && \
+        (\$PKG_MGR add nano 2> /dev/null || \$PKG_MGR install -y nano); \
+    fi
+RUN echo "set mouse" > /root/.nanorc && \\
+    echo "set multibuffer" >> /root/.nanorc && \\
+    echo "set casesensitive" >> /root/.nanorc && \\
+    echo "set softwrap" >> /root/.nanorc && \\
+    echo "set tabsize 4" >> /root/.nanorc && \\
+    echo "include \"~/.nano/syntax/*.nanorc\"" >> /root/.nanorc
+CMD [ "tail", "-f", "/dev/null" ]
+EOF
+    fi
 fi
 
-if [[ $opt =~ ^(dockerdo|both)$ ]]; then
-    mkdir -p ~/.local/bin
-    chmod +x dockerdo
-    cp dockerdo ~/.local/bin/dockerdo
-    sed -i "/^export PATH=~\/\.local\/bin:\$PATH$/d" ~/.bashrc
-    echo "export PATH=~/.local/bin:\$PATH" >> ~/.bashrc
-    source ~/.bashrc
-    echo
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo " SUCCESS dockerdo installed "
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo "to get started, run"
-    echo "dockerdo help"
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo
+if [[ "${1:-help}" == "help" ]]; then
+    cat << EOF | { less || more || cat; } 2> /dev/null
+ ----------------- 
+|  dockerdo help  |
+ ----------------- 
+(If you are seeing this, dockerdo is installed)
+ EXIT with 'q'
+
+OPTIONS
+first slot: brush, build, run, shell, start, stop, restart, rm, rmi, expel, ps, images, help
+second slot: it, init, add
+  it: interactive
+  init: interactive, overwrites .env if present (compat with build/brush/run)
+  add: interactive, adds to .env if present (compat with build/brush/run)
+
+ENV
+create .env with below to automate (or run 'docker brush add'):
+IMAGE_SOURCE=_____
+IMAGE_NAME=_____
+CONTAINER_NAME=_____
+WORKDIR=_____
+NANO_SYNTAX_DIR=_____
+PORT_MAPPINGS=_____
+
+HINTS
+'dockerdo help' to revisit this info
+'dockerdo build' to build from a .env
+'dockerdo brush' to (b)uild, (ru)n, then (sh)ell consecutively
+'dockerdo expel' to tear it all down
+EOF
+elif [[ $1 == "brush" ]]; then
+    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:latest : " in && echo "${in:-alpine:latest}")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine-latest : " in && echo "${in:-alpine-latest}")}
+    WORKDIR=${WORKDIR:-$(read -ep "working directory of new image i.e. /usr/src/app : " in && echo "${in:-/usr/src/app}")}
+    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -ep "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "${in:-/usr/share/nano}")}
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine-app : " in && echo "${in:-alpine-app}")}
+    mkenv
+    match_full=$(docker image inspect --format "{{join .RepoTags \", \"}}" "$IMAGE_NAME" 2> /dev/null)
+    if [[ $match_full ]]; then
+        echo -e "\nERROR -> $match_full exists\n"
+        PS3="choose a resolution: "
+        COLUMNS=1
+        select opt in "preserve and autoname image" "expel image and its containers" "exit"; do
+            case $opt in
+                "preserve and autoname image")
+                    sectag=$(date +%s%N | cut -b1-10)
+                    match_pre=$(echo $match_full | cut -d ':' -f1)
+                    docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+                    docker tag $match_full $match_pre:$sectag && docker rmi $match_full
+                    echo "conflicting image was renamed to $match_full:$sectag";
+                    break
+                    ;;
+                "expel image and its containers") dockerdo expel $match_full; break;;
+                "exit") echo "exiting"; exit 1;;
+                *) echo "exiting"; exit 1;;
+            esac
+        done
+    fi
+    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="$WORKDIR" -t "$IMAGE_NAME" .
+    docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME" 2> /dev/null || { echo "$CONTAINER_NAME exists, exiting"; exit 1; }
+    docker exec "$CONTAINER_NAME" which nano &> /dev/null || (echo "       ~~~~ " && echo "ATTN : nano is not installed" && echo "       ~~~~ ")
+    docker exec -it "$CONTAINER_NAME" /bin/bash &> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
+elif [[ $1 == "build" ]]; then
+    IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:latest : " in && echo "${in:-alpine:latest}")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine-app : " in && echo "${in:-alpine-latest}")}
+    WORKDIR=${WORKDIR:-$(read -ep "working directory of new image i.e. /usr/src/app : " in && echo "${in:-/usr/src/app}")}
+    mkenv
+    docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="$WORKDIR" -t "$IMAGE_NAME" .
+elif [[ $1 == "run" ]]; then
+    NANO_SYNTAX_DIR=${NANO_SYNTAX_DIR:-$(read -ep "path to nano syntax files i.e. $HOME/.nano/syntax : " in && echo "${in:-/usr/share/nano}")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of image i.e. alpine-app : " in && echo "$in")}
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine-app : " in && echo "$in")}
+    mkenv
+    docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME"
+    docker exec "$CONTAINER_NAME" which nano &> /dev/null || (echo "       ~~~~ " && echo "ATTN : nano is not installed" && echo "       ~~~~ ")
+elif [[ $1 == "shell" ]]; then
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container to shell into : " in && echo "$in")}
+    docker exec "$CONTAINER_NAME" which nano &> /dev/null || (echo "       ~~~~ " && echo "ATTN : nano is not installed" && echo "       ~~~~ ")
+    docker exec -it "$CONTAINER_NAME" /bin/bash &> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
+elif [[ $1 =~ ^(start|stop|restart|rm|rmi)$ ]]; then
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of relevant : " in && echo "$in")}
+    docker $1 "$CONTAINER_NAME"
+elif [[ $1 == "expel" ]]; then
+    read -ep "expel container and image? (y/n): " -r in && [[ $in != "y" ]] && exit 0
+    CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container to remove : " in && echo "$in")}
+    IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of image to remove : " in && echo "$in")}
+    docker stop "$CONTAINER_NAME" && docker rm "$CONTAINER_NAME"
+    docker rmi "$IMAGE_NAME"
+elif [[ $1 == "ps" ]]; then
+    docker ps --format "table {{.Names}}\t{{.Ports}}" | { less || more || cat; } 2> /dev/null
+elif [[ $1 == "images" ]]; then
+    docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}" | { less || more || cat; } 2> /dev/null
+else
+    dockerdo help
 fi
