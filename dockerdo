@@ -44,13 +44,16 @@ ARG IMAGE_SOURCE
 ARG WORKDIR
 
 FROM \${IMAGE_SOURCE}
+
 COPY . \${WORKDIR}
 WORKDIR \${WORKDIR}
 $(echo -e $expose_portion)
 RUN mkdir -p /root/.nano/syntax
-RUN PKG_MGR=\$(command -v apk || command -v apt || command -v dnf || command -v yum) 2> /dev/null && \\
-    \$PKG_MGR update 2>/dev/null && \\
-    { \$PKG_MGR add nano || \$PKG_MGR install -y nano; } 2>/dev/null
+RUN PKG_MGR=$(command -v apk || command -v apt || command -v dnf || command -v yum) &> /dev/null && \
+    if [ -n "$PKG_MGR" ]; then \
+        $PKG_MGR update &> /dev/null && \
+        ($PKG_MGR add nano || $PKG_MGR install -y nano); \
+    fi
 RUN echo "set mouse" > /root/.nanorc && \\
     echo "set multibuffer" >> /root/.nanorc && \\
     echo "set casesensitive" >> /root/.nanorc && \\
@@ -121,8 +124,9 @@ elif [[ $1 == "brush" ]]; then
         done
     fi
     docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg WORKDIR="$WORKDIR" -t "$IMAGE_NAME" .
-    docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME" 2> /dev/null || { echo "container exists, exiting"; exit 1; }
-    docker exec -it "$CONTAINER_NAME" /bin/bash 2> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
+    docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME" 2> /dev/null || { echo "$CONTAINER_NAME exists, exiting"; exit 1; }
+    docker exec "$CONTAINER_NAME" which nano 2> /dev/null || echo "ATTN nano is not installed"
+    docker exec -it "$CONTAINER_NAME" /bin/bash &> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
 elif [[ $1 == "build" ]]; then
     IMAGE_SOURCE=${IMAGE_SOURCE:-$(read -ep "build from image i.e. alpine:latest : " in && echo "${in:-alpine:latest}")}
     IMAGE_NAME=${IMAGE_NAME:-$(read -ep "name of new image i.e. alpine-app : " in && echo "${in:-alpine-latest}")}
@@ -135,9 +139,11 @@ elif [[ $1 == "run" ]]; then
     CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container i.e. alpine-app : " in && echo "$in")}
     mkenv
     docker run -d $portmap_portion -v "$NANO_SYNTAX_DIR":/root/.nano/syntax --name "$CONTAINER_NAME" "$IMAGE_NAME"
+    docker exec "$CONTAINER_NAME" which nano 2> /dev/null || echo "ATTN nano is not installed"
 elif [[ $1 == "shell" ]]; then
     CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of container to shell into : " in && echo "$in")}
-    docker exec -it "$CONTAINER_NAME" /bin/bash 2> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
+    docker exec "$CONTAINER_NAME" which nano 2> /dev/null || echo "       ~~~~ " && echo "ATTN : nano is not installed" && echo "       ~~~~ "
+    docker exec -it "$CONTAINER_NAME" /bin/bash &> /dev/null || docker exec -it "$CONTAINER_NAME" /bin/sh
 elif [[ $1 =~ ^(start|stop|restart|rm|rmi)$ ]]; then
     CONTAINER_NAME=${CONTAINER_NAME:-$(read -ep "name of relevant : " in && echo "$in")}
     docker $1 "$CONTAINER_NAME"
