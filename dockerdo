@@ -2,16 +2,16 @@
 
 [[ ! $2 =~ ^(it|init)$ ]] && [[ -f .env ]] && source .env
 
+two=$2
 mkenv() {
-    if [[ $2 == "init" ]]; then
+    if [[ $two == "init" ]]; then
         echo "'n' will leave .env untouched, but fulfill command"
         echo "press 'Ctrl+C' to cancel"
         [[ -f .env ]] && read -ep "WARNING: you are creating/ovewriting .env (y/n): " -r in && [[ $in != "y" ]] && return
-    elif [[ $2 == "add" ]]; then
+    elif [[ $two == "add" ]]; then
         echo "'n' will leave .env untouched, but fulfill command"
         echo "press 'Ctrl+C' to cancel"
-        [[ -f .env ]] && read -ep "WARNING: you are adding to .env (y/n): " -r in && [[ $in != "y" ]] && return
-    elif [[ $2 != "it" && ! -f .env ]]; then
+    elif [[ $two != "it" && ! -f .env ]]; then
         read -ep "create .env? (y/n): " -r in && [[ $in != "y" ]] && return
     fi
     cat << EOF > .env
