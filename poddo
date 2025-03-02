@@ -3,7 +3,7 @@
 [ -z "$2" ] && echo "ERROR : no target specified" && exit 1
 
 if [[ $1 == "run" ]]; then
-    mkdir -p $HOME/.poddo && mkdir -p $HOME/.nano && touch $HOME/.nanorc
+    mkdir -p $HOME/.poddo ; mkdir -p $HOME/.nano ; touch $HOME/.nanorc
     echo "podman run -d -v $HOME/.nanorc:/root/.nanorc -v ${NANO_SYNTAX_DIR:-$HOME/.nano}:/root/.nano ${@:2} tail -f /dev/null" | tee -a ~/.poddo/history.txt
     c_id=$(podman run -d -v "$HOME"/.nanorc:/root/.nanorc -v "${NANO_SYNTAX_DIR:-$HOME/.nano}":/root/.nano "${@:2}" tail -f /dev/null)
     [[ $? == 125 ]] && podman pull "docker.io/library/$2" && poddo run "$2"
