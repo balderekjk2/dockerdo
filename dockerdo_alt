@@ -2,8 +2,22 @@
 
 if [[ $1 =~ ^(ps|images)$ ]]; then
     docker "$@" | { less || more || cat; }
+elif [[ $1 =~ ^(-h|--help)$ ]]; then
+    echo -e "\n  -----\n"
+    echo -e "  PULL, RUN AND SHELL INTO ALPINE\n    docker run alpine\n"
+    echo -e "  DITTO AND MOUNT PWD\n    docker run . alpine\n"
+    echo -e "  DITTO AND MORE\n    docker run . -p 8000:8000 -v \$PWD/.local/bin/somescript:/bin/somescript --name alpine-app alpine\n\n  -----"
+    echo
+    echo -e "  KILL AND REMOVE CONTAINER\n    docker rm alpine-app\n"
+    echo -e "  DITTO AND REMOVE IMAGE\n    docker rm alpine-app alpine\n"
+    echo -e "  REMOVE JUST AN IMAGE\n    docker rm - alpine\n\n  -----"
+    echo
+    echo -e "  VIEW COMMANDLOG\n    docker history\n"
+    echo -e "  CLEAR COMMANDLOG\n    docker history -cw"
+    echo -e "\n  -----\n"
+    exit 0
 elif [[ ! $1 =~ ^(history)$ ]]; then
-    [ -z "$2" ] && echo "ERROR : no target specified" && exit 1
+    [ -z "$2" ] && echo "ERROR\n    no target specified" && exit 1
 fi
 
 if [[ $1 == "run" ]]; then
