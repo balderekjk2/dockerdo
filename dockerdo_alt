@@ -8,15 +8,16 @@ fi
 
 if [[ $1 == "run" ]]; then
     mkdir -p $HOME/.local/dockerdo ; mkdir -p $HOME/.nano ; touch $HOME/.nanorc
-    c_id=$(docker run -d -v "$HOME"/.nanorc:/root/.nanorc -v "${NANO_SYNTAX_DIR:-$HOME/.nano}":/root/.nano "${@:2}" tail -f /dev/null)
+    [[ $2 == "." ]] && remainder="-v $PWD:/app -w /app ${@:3}" || remainder="${@:2}"
+    c_id=$(docker run -d -v "$HOME"/.nanorc:/root/.nanorc -v "${NANO_SYNTAX_DIR:-$HOME/.nano}":/root/.nano $remainder tail -f /dev/null)
+    echo "echo $? && docker run -d -v $HOME/.nanorc:/root/.nanorc -v ${NANO_SYNTAX_DIR:-$HOME/.nano}:/root/.nano $remainder tail -f /dev/null" | tee -a ~/.local/dockerdo/history.txt
     if [[ $? -eq 0 ]]; then
-        echo "docker run -d -v $HOME/.nanorc:/root/.nanorc -v ${NANO_SYNTAX_DIR:-$HOME/.nano}:/root/.nano ${@:2} tail -f /dev/null" | tee -a ~/.local/dockerdo/history.txt
         docker exec -it "$c_id" /bin/bash 2> /dev/null || docker exec -it "$c_id" /bin/sh
     else
         docker pull "$2" && dockerdo run "$2"
     fi
 elif [[ $1 == "rm" ]]; then
-    if [[ $2 != "." ]]; then
+    if [[ $2 != "-" ]]; then
         docker kill "$2" 2> /dev/null
         docker rm "$2" 2> /dev/null
     fi
