@@ -22,9 +22,20 @@ fi
 
 if [[ $1 == "run" ]]; then
     mkdir -p $HOME/.local/dockerdo ; mkdir -p $HOME/.nano ; touch $HOME/.nanorc
-    [[ $2 == "." ]] && remainder="-v $PWD:/app -w /app ${@:3}" || remainder="${@:2}"
-    c_id=$(docker run -d -v "$HOME"/.nanorc:/root/.nanorc -v "${NANO_SYNTAX_DIR:-$HOME/.nano}":/root/.nano $remainder tail -f /dev/null)
-    echo "echo $? && docker run -d -v $HOME/.nanorc:/root/.nanorc -v ${NANO_SYNTAX_DIR:-$HOME/.nano}:/root/.nano $remainder tail -f /dev/null" | tee -a ~/.local/dockerdo/history.txt
+    args=("${@:2}")
+    args_count=${#args[@]}
+    cmd=
+    remainder=
+    if [[ $args_count -ge 2 && ${args[$args_count-2]} == "-" ]]; then
+        cmd=${args[$args_count-1]}
+        [[ $2 == "." ]] && remainder="${@:3:$args_count-3}" || remainder="${@:2:$args_count-2}"
+        remainder="-v $PWD:/app -w /app $remainder"
+    else
+        cmd="tail -f /dev/null"
+        [[ $2 == "." ]] && remainder="-v $PWD:/app -w /app ${@:3}" || remainder="${@:2}"
+    fi
+    c_id=$(docker run -d -v "$HOME"/.nanorc:/root/.nanorc -v "${NANO_SYNTAX_DIR:-$HOME/.nano}":/root/.nano $remainder $cmd)
+    echo "echo $? && docker run -d -v $HOME/.nanorc:/root/.nanorc -v ${NANO_SYNTAX_DIR:-$HOME/.nano}:/root/.nano $remainder $cmd" | tee -a ~/.local/dockerdo/history.txt
     if [[ $? -eq 0 ]]; then
         docker exec -it "$c_id" /bin/bash 2> /dev/null || docker exec -it "$c_id" /bin/sh
     else
