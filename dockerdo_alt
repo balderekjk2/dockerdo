@@ -6,7 +6,8 @@ elif [[ $1 =~ ^(-h|--help)$ ]]; then
     echo -e "\n  -----\n"
     echo -e "  PULL, RUN AND SHELL INTO ALPINE\n    docker run alpine\n"
     echo -e "  DITTO AND MOUNT PWD\n    docker run . alpine\n"
-    echo -e "  DITTO AND MORE\n    docker run . -p 8000:8000 -v \$PWD/.local/bin/somescript:/bin/somescript --name alpine-app alpine\n\n  -----"
+    echo -e "  DITTO AND PASS CMD\n    docker run . alpine - \"/bin/sh\""
+    echo -e "  DITTO AND MORE\n    docker run . -p 8000:8000 -v \$PWD/.local/bin/somescript:/bin/somescript --name php-app php:cli - \"php -S 0.0.0.0:8000 -t /app/html\"\n\n  -----"
     echo
     echo -e "  KILL AND REMOVE CONTAINER\n    docker rm alpine-app\n"
     echo -e "  DITTO AND REMOVE IMAGE\n    docker rm alpine-app alpine\n"
